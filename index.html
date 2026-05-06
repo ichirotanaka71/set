@@ -1,54 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>組 -KUMI-</title>
 <style>
-/* アニメーションとスタイルをここに統合 */
-:root { --washi: #f2ede4; --sumi: #1a1510; --kin: #c49a3c; --aka: #b5321e; --seiji: #3d6e63; }
-body { background: var(--washi); color: var(--sumi); font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; margin:0; }
+  :root { --washi: #f2ede4; --sumi: #1a1510; --kin: #c49a3c; --aka: #b5321e; --seiji: #3d6e63; }
+  body { background: var(--washi); color: var(--sumi); font-family: 'Shippori Mincho', serif; margin:0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  
+  /* 霊のアニメーション */
+  @keyframes spirit-alive {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    33% { transform: translateY(-8px) rotate(2deg) scale(1.03); }
+    66% { transform: translateY(-4px) rotate(-2deg) scale(0.97); }
+  }
 
-/* 霊のアニメーション */
-@keyframes spirit-alive {
-  0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
-  33% { transform: translateY(-8px) rotate(2deg) scale(1.03); }
-  66% { transform: translateY(-4px) rotate(-2deg) scale(0.97); }
-}
-
-/* 12枚対応のグリッド */
-#board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, 1fr); gap: 6px; flex: 1; padding: 10px; }
-.card { background: white; border: 1px solid #ccc; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .1s; }
-.card.selected { border: 2px solid var(--kin); background: #fffbf0; }
-.card.correct { border: 2px solid var(--seiji); }
-.card.wrong { border: 2px solid var(--aka); }
-
-/* SVGアイコンをふわふわさせる */
-.card svg { 
-  width: 80%; height: 80%; display: block;
-  animation: spirit-alive 4s ease-in-out infinite;
-  animation-delay: var(--float-delay, 0s);
-  transform-origin: center;
-}
-#ui { padding: 10px; text-align: center; font-weight: bold; }
+  /* タイトル画面 */
+  #start-screen { position: absolute; inset:0; z-index:100; background: var(--washi); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:15px; }
+  
+  /* ゲーム画面 */
+  #game-ui { display: none; flex-direction: column; height: 100%; }
+  #board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px; flex: 1; overflow-y: auto; }
+  .card { background: white; border: 1px solid #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .1s; }
+  .card svg { width:80%; height:80%; display:block; animation: spirit-alive 4s ease-in-out infinite; animation-delay: var(--float-delay, 0s); transform-origin: center; }
+  .card.selected { border: 3px solid var(--kin); background: #fffbf0; }
+  .card.wrong { border: 3px solid var(--aka); }
+  
+  #ui { padding: 15px; text-align: center; font-weight: bold; font-size: 1.2rem; }
+  select, button { padding: 10px 20px; font-size: 1rem; cursor: pointer; }
 </style>
+</head>
+<body>
 
-<div id="ui">組 -KUMI- <span id="score">0</span></div>
-<div id="board"></div>
+<div id="start-screen">
+  <h1>組 -KUMI-</h1>
+  <label>パネル枚数：</label>
+  <select id="panel-count">
+    <script>
+      for(let i=3; i<=15; i++) document.write(`<option value="${i}" ${i==9?'selected':''}>${i}枚</option>`);
+    </script>
+  </select>
+  <button id="btn-start">ゲーム開始</button>
+</div>
+
+<div id="game-ui">
+  <div id="ui">組数：<span id="score">0</span></div>
+  <div id="board"></div>
+</div>
 
 <script>
-// --- ロジック部分 ---
 const COLORS=['aka','seiji','yamabuki'], SHAPES=['ougi','torii','ume'], COUNTS=[1,2,3], CM={aka:'#b5321e',seiji:'#3d6e63',yamabuki:'#c49a3c'};
-let deck=[],board=[],sel=[],score=0;
+let deck=[], board=[], sel=[], score=0, targetCount=9;
 
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function makeDeck(){const d=[];for(const c of COLORS)for(const s of SHAPES)for(const n of COUNTS)d.push({color:c,shape:s,count:n});return shuffle(d);}
 function isSet(a,b,c){for(const k of['color','shape','count']){if(new Set([a[k],b[k],c[k]]).size===2)return false;}return true;}
 
-// --- 図形描画ロジック（ここが抜けていました！） ---
-function drawOugi(col,cy){const g=document.createElementNS('http://www.w3.org/2000/svg','g');const cx=40,base=cy+10;const fanPath=document.createElementNS('http://www.w3.org/2000/svg','path');let d=`M ${cx} ${base} `;for(let a=-70;a<=70;a+=10){const rad=(a-90)*Math.PI/180;d+=`L ${cx+Math.cos(rad)*18} ${base+Math.sin(rad)*18} `;}d+=`Z`;fanPath.setAttribute('d',d);fanPath.setAttribute('fill',col);g.appendChild(fanPath);return g;}
-function drawTorii(col,cy){const g=document.createElementNS('http://www.w3.org/2000/svg','g');const cx=40;const kasagi=document.createElementNS('http://www.w3.org/2000/svg','path');kasagi.setAttribute('d',`M ${cx-16} ${cy-8} Q ${cx} ${cy-14} ${cx+16} ${cy-8} L ${cx+16} ${cy-4} Q ${cx} ${cy-10} ${cx-16} ${cy-4} Z`);kasagi.setAttribute('fill',col);g.appendChild(kasagi);const l=document.createElementNS('http://www.w3.org/2000/svg','rect');l.setAttribute('x',cx-13);l.setAttribute('y',cy-10);l.setAttribute('width','5');l.setAttribute('height','24');l.setAttribute('fill',col);g.appendChild(l);const r=document.createElementNS('http://www.w3.org/2000/svg','rect');r.setAttribute('x',cx+8);r.setAttribute('y',cy-10);r.setAttribute('width','5');r.setAttribute('height','24');r.setAttribute('fill',col);g.appendChild(r);return g;}
-function drawUme(col,cy){const g=document.createElementNS('http://www.w3.org/2000/svg','g');const cx=40;for(let i=0;i<5;i++){const a=(i*72-90)*Math.PI/180;const p=document.createElementNS('http://www.w3.org/2000/svg','ellipse');p.setAttribute('cx',cx+Math.cos(a)*7);p.setAttribute('cy',cy+Math.sin(a)*7);p.setAttribute('rx','5.5');p.setAttribute('ry','7');p.setAttribute('transform',`rotate(${i*72},${cx+Math.cos(a)*7},${cy+Math.sin(a)*7})`);p.setAttribute('fill',col);g.appendChild(p);}return g;}
+function drawOugi(col,cy){const g=document.createElementNS('http://www.w3.org/2000/svg','g');const cx=40;const path=document.createElementNS('http://www.w3.org/2000/svg','path');let d=`M ${cx} ${cy} `;for(let a=-70;a<=70;a+=15){const rad=(a-90)*Math.PI/180;d+=`L ${cx+Math.cos(rad)*20} ${cy+Math.sin(rad)*20} `;}d+=`Z`;path.setAttribute('d',d);path.setAttribute('fill',col);g.appendChild(path);return g;}
+function drawTorii(col,cy){const g=document.createElementNS('http://www.w3.org/2000/svg','g');const cx=40;const kasagi=document.createElementNS('http://www.w3.org/2000/svg','path');kasagi.setAttribute('d',`M ${cx-18} ${cy-5} Q ${cx} ${cy-12} ${cx+18} ${cy-5} L ${cx+18} ${cy-1} Q ${cx} ${cy-8} ${cx-18} ${cy-1} Z`);kasagi.setAttribute('fill',col);g.appendChild(kasagi);const l=document.createElementNS('http://www.w3.org/2000/svg','rect');l.setAttribute('x',cx-14);l.setAttribute('y',cy-6);l.setAttribute('width','6');l.setAttribute('height','20');l.setAttribute('fill',col);g.appendChild(l);const r=document.createElementNS('http://www.w3.org/2000/svg','rect');r.setAttribute('x',cx+8);r.setAttribute('y',cy-6);r.setAttribute('width','6');r.setAttribute('height','20');r.setAttribute('fill',col);g.appendChild(r);return g;}
+function drawUme(col,cy){const g=document.createElementNS('http://www.w3.org/2000/svg','g');const cx=40;for(let i=0;i<5;i++){const a=(i*72-90)*Math.PI/180;const p=document.createElementNS('http://www.w3.org/2000/svg','ellipse');p.setAttribute('cx',cx+Math.cos(a)*8);p.setAttribute('cy',cy+Math.sin(a)*8);p.setAttribute('rx','6');p.setAttribute('ry','8');p.setAttribute('transform',`rotate(${i*72},${cx+Math.cos(a)*8},${cy+Math.sin(a)*8})`);p.setAttribute('fill',col);g.appendChild(p);}return g;}
 
 function makeShape(card){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.setAttribute('viewBox','0 0 80 90');
   const col=CM[card.color], n=card.count;
-  const gap=28, startY=45-((n-1)*gap)/2;
+  const gap=30, startY=45-((n-1)*gap)/2;
   for(let i=0;i<n;i++){
     if(card.shape==='ougi') svg.appendChild(drawOugi(col, startY+i*gap));
     else if(card.shape==='torii') svg.appendChild(drawTorii(col, startY+i*gap));
@@ -62,7 +78,6 @@ function render(){
   board.forEach((card,i)=>{
     const div=document.createElement('div'); div.className='card';
     const svg=makeShape(card);
-    // ふわふわのタイミングをずらす
     svg.style.setProperty('--float-delay', (-Math.random() * 4).toFixed(1) + 's');
     div.appendChild(svg);
     div.onclick=()=>{
@@ -79,12 +94,26 @@ function submit(){
   if(isSet(a,b,c)){
     score++; document.getElementById('score').textContent=score;
     sel.sort((a,b)=>b-a).forEach(i=>board.splice(i,1));
-    while(board.length<12 && deck.length>0) board.push(deck.pop());
+    while(board.length < targetCount && deck.length > 0) board.push(deck.pop());
     render();
+  } else {
+    document.querySelectorAll('.card.selected').forEach(c=>c.classList.add('wrong'));
+    setTimeout(()=>{
+      document.querySelectorAll('.card').forEach(c=>c.classList.remove('selected','wrong'));
+      sel=[];
+    },500);
   }
-  sel=[]; document.querySelectorAll('.card').forEach(c=>c.classList.remove('selected'));
+  sel=[];
 }
 
-deck=makeDeck(); board=[]; for(let i=0;i<12;i++) board.push(deck.pop());
-render();
+document.getElementById('btn-start').addEventListener('click',()=>{
+  targetCount = parseInt(document.getElementById('panel-count').value);
+  document.getElementById('start-screen').style.display='none';
+  document.getElementById('game-ui').style.display='flex';
+  deck=makeDeck(); board=[];
+  for(let i=0;i<targetCount;i++) board.push(deck.pop());
+  render();
+});
 </script>
+</body>
+</html>
